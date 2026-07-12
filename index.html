@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -138,15 +138,21 @@ html[data-theme="light"] .blob{opacity:.14;}
   .ai-launcher .label{display:none;}
 }
 
-.ai-panel{
-  position:fixed; bottom:96px; right:26px; z-index:151; width:380px; max-width:calc(100vw - 32px);
-  height:min(560px, 70vh); background:var(--void-2); border:1px solid var(--border); border-radius:20px;
-  box-shadow:0 40px 90px -20px var(--shadow-soft); display:flex; flex-direction:column; overflow:hidden;
-  opacity:0; transform:translateY(16px) scale(.97); pointer-events:none; transition:opacity .25s ease, transform .25s ease;
+.ai-backdrop{
+  position:fixed; inset:0; z-index:150; background:rgba(0,0,0,0.45);
+  opacity:0; pointer-events:none; transition:opacity .3s ease; backdrop-filter:blur(2px);
 }
-.ai-panel.open{opacity:1; transform:translateY(0) scale(1); pointer-events:auto;}
+.ai-backdrop.open{opacity:1; pointer-events:auto;}
+
+.ai-panel{
+  position:fixed; top:0; right:0; bottom:0; z-index:151; width:400px; max-width:88vw;
+  height:100%; background:var(--void-2); border-left:1px solid var(--border);
+  box-shadow:-30px 0 60px -20px var(--shadow-soft); display:flex; flex-direction:column; overflow:hidden;
+  transform:translateX(100%); pointer-events:none; transition:transform .35s cubic-bezier(.16,.8,.24,1);
+}
+.ai-panel.open{transform:translateX(0); pointer-events:auto;}
 @media (max-width:640px){
-  .ai-panel{right:16px; left:16px; width:auto; bottom:86px; height:min(500px, 65vh);}
+  .ai-panel{width:100%; max-width:100%;}
 }
 
 .ai-panel-head{
@@ -1111,6 +1117,7 @@ footer.site-foot{
   <span class="label">Ask AI about me</span>
 </button>
 
+<div class="ai-backdrop" id="aiBackdrop"></div>
 <div class="ai-panel" id="aiPanel" role="dialog" aria-label="Ask AI about Abhishek">
   <div class="ai-panel-head">
     <div>
@@ -1328,6 +1335,7 @@ footer.site-foot{
 
   var launcher = document.getElementById('aiLauncher');
   var panel = document.getElementById('aiPanel');
+  var backdrop = document.getElementById('aiBackdrop');
   var closeBtn = document.getElementById('aiClose');
   var messages = document.getElementById('aiMessages');
   var input = document.getElementById('aiInput');
@@ -1339,16 +1347,20 @@ footer.site-foot{
   function openPanel(){
     isOpen = true;
     panel.classList.add('open');
+    backdrop.classList.add('open');
     launcher.setAttribute('aria-expanded', 'true');
     setTimeout(function(){ input.focus(); }, 200);
   }
   function closePanel(){
     isOpen = false;
     panel.classList.remove('open');
+    backdrop.classList.remove('open');
     launcher.setAttribute('aria-expanded', 'false');
   }
   launcher.addEventListener('click', function(){ isOpen ? closePanel() : openPanel(); });
   closeBtn.addEventListener('click', closePanel);
+  backdrop.addEventListener('click', closePanel);
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && isOpen) closePanel(); });
 
   function addMessage(text, sender){
     var div = document.createElement('div');
