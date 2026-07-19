@@ -73,6 +73,8 @@ CONTACT:
 - Phone: +91 91688 49070
 - Location: Pune, India
 - LinkedIn: https://www.linkedin.com/in/abhishek-bhosale-0aa10383
+- Work authorization / relocation / visa sponsorship status: not yet specified. If asked, say this
+  detail isn't listed here and suggest the visitor ask Abhishek directly via email.
 `;
 
 export default {
@@ -105,23 +107,48 @@ export default {
       const model = "gemini-flash-latest"; // auto-updating alias, avoids breakage when Google retires specific model versions
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-      const geminiResponse = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: PORTFOLIO_CONTEXT }] },
-          contents: [{ role: "user", parts: [{ text: question }] }],
-          generationConfig: { maxOutputTokens: 500, temperature: 0.25 },
-        }),
+      const requestBody = JSON.stringify({
+        system_instruction: { parts: [{ text: PORTFOLIO_CONTEXT }] },
+        contents: [{ role: "user", parts: [{ text: question }] }],
+        generationConfig: { maxOutputTokens: 500, temperature: 0.25 },
       });
 
-      const data = await geminiResponse.json();
+      // Retry a couple of times if Gemini is temporarily overloaded (503) before giving up
+      const maxAttempts = 3;
+      let geminiResponse, data;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        geminiResponse = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: requestBody,
+        });
+        data = await geminiResponse.json();
+
+        if (geminiResponse.ok) break;
+
+        const isOverloaded = data?.error?.code === 503 || data?.error?.status === "UNAVAILABLE";
+        if (isOverloaded && attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 700)); // brief backoff: ~0.7s, then ~1.4s
+          continue;
+        }
+        break;
+      }
 
       if (!geminiResponse.ok) {
-        return new Response(JSON.stringify({ error: "Upstream error", detail: data }), {
-          status: 502,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        const isOverloaded = data?.error?.code === 503 || data?.error?.status === "UNAVAILABLE";
+        return new Response(
+          JSON.stringify({
+            error: isOverloaded ? "Model temporarily overloaded" : "Upstream error",
+            answer: isOverloaded
+              ? "The AI model is a bit busy right now. Please try asking again in a few seconds."
+              : undefined,
+            detail: data,
+          }),
+          {
+            status: 502,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
       }
 
       const answer =
